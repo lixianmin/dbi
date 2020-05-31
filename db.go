@@ -37,6 +37,22 @@ func NewDB(db *sql.DB) *DB {
 	return my
 }
 
+// Connect to a database and verify with a ping.
+func Connect(driverName, dataSourceName string) (*DB, error) {
+	db, err := sql.Open(driverName, dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Ping()
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return NewDB(db), nil
+}
+
 func (db *DB) SetPreExecuteHandler(handler func(ctx *Context)) {
 	if handler != nil {
 		db.preExecuteHandler = handler
