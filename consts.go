@@ -11,6 +11,8 @@ const (
 	None = iota
 	BeginTx
 	QueryContext
+	GetContext
+	SelectContext
 	ExecContext
 	TxQueryContext
 	TxExecContext
