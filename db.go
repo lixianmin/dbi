@@ -46,7 +46,7 @@ func Connect(driverName, dataSourceName string) (*DB, error) {
 
 	err = db.Ping()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
@@ -69,8 +69,12 @@ func (db *DB) SetPostExecuteHandler(handler func(ctx *Context)) {
 	}
 }
 
-func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
-	var ctx1 = newContext(ctx, BeginTx, "BeginTx")
+func (db *DB) BeginTx(opts *sql.TxOptions) (*Tx, error) {
+	return db.BeginTxContext(context.Background(), opts)
+}
+
+func (db *DB) BeginTxContext(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+	var ctx1 = newContext(ctx, DBBeginTx, "BeginTx")
 
 	db.preExecuteHandler(ctx1)
 	var tx, err = db.DB.BeginTx(ctx1, opts)
@@ -81,8 +85,12 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	return tx1, err
 }
 
+func (db *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return db.QueryContext(context.Background(), query, args...)
+}
+
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	var ctx1 = newContext(ctx, QueryContext, query)
+	var ctx1 = newContext(ctx, DBQuery, query)
 
 	db.preExecuteHandler(ctx1)
 	var rows, err = db.DB.QueryContext(ctx1, query, args...)
@@ -91,8 +99,12 @@ func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{
 	return rows, err
 }
 
+func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
+	return db.ExecContext(context.Background(), query, args...)
+}
+
 func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	var ctx1 = newContext(ctx, ExecContext, query)
+	var ctx1 = newContext(ctx, DBExec, query)
 
 	db.postExecuteHandler(ctx1)
 	var result, err = db.DB.ExecContext(ctx1, query, args...)
@@ -101,8 +113,12 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}
 	return result, err
 }
 
+func (db *DB) Get(ctx context.Context, query string, args ...interface{}) error {
+	return db.GetContext(context.Background(), query, args...)
+}
+
 func (db *DB) GetContext(ctx context.Context, query string, args ...interface{}) error {
-	var ctx1 = newContext(ctx, GetContext, query)
+	var ctx1 = newContext(ctx, DBGet, query)
 
 	db.postExecuteHandler(ctx1)
 	var err = db.getContextInner(ctx1, query, args...)
@@ -201,10 +217,13 @@ func scanOneRow(rows *sql.Rows, dest ...interface{}) error {
 	return nil
 }
 
-// Select using this DB.
+func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
+	return db.SelectContext(context.Background(), dest, query, args...)
+}
+
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
-	var ctx1 = newContext(ctx, SelectContext, query)
+	var ctx1 = newContext(ctx, DBSelect, query)
 
 	db.postExecuteHandler(ctx1)
 	var err = db.selectContextInner(ctx1, dest, query, args...)

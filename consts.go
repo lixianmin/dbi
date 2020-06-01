@@ -9,13 +9,13 @@ Copyright (C) - All Rights Reserved
 
 const (
 	None = iota
-	BeginTx
-	QueryContext
-	GetContext
-	SelectContext
-	ExecContext
-	TxQueryContext
-	TxExecContext
+	DBBeginTx
+	DBQuery
+	DBGet
+	DBSelect
+	DBExec
+	TxQuery
+	TxExec
 	TxCommit
 	TxRollback
 )
