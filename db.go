@@ -18,12 +18,15 @@ Copyright (C) - All Rights Reserved
  *********************************************************************/
 
 var emptyHandler = func(ctx *Context) {}
+var emptyErrorFilter = func(err error) error { return err }
 
 type DB struct {
-	DB                 *sql.DB
-	Mapper             *reflectx.Mapper
+	DB     *sql.DB
+	Mapper *reflectx.Mapper
+
 	preExecuteHandler  func(*Context)
 	postExecuteHandler func(*Context)
+	errorFilter        func(err error) error // 所有的public方法，都需要在返回err的时候调用errorFilter(err)
 }
 
 func NewDB(db *sql.DB) *DB {
@@ -32,6 +35,7 @@ func NewDB(db *sql.DB) *DB {
 		Mapper:             reflectx.NewMapperFunc("db", strings.ToLower),
 		preExecuteHandler:  emptyHandler,
 		postExecuteHandler: emptyHandler,
+		errorFilter:        emptyErrorFilter,
 	}
 
 	return my
@@ -69,6 +73,12 @@ func (db *DB) SetPostExecuteHandler(handler func(ctx *Context)) {
 	}
 }
 
+func (db *DB) SetErrorFilter(filter func(error) error) {
+	if filter != nil {
+		db.errorFilter = filter
+	}
+}
+
 func (db *DB) BeginTx(opts *sql.TxOptions) (*Tx, error) {
 	return db.BeginTxContext(context.Background(), opts)
 }
@@ -78,7 +88,7 @@ func (db *DB) BeginTxContext(ctx context.Context, opts *sql.TxOptions) (*Tx, err
 
 	db.preExecuteHandler(ctx1)
 	var tx, err = db.DB.BeginTx(ctx1, opts)
-	ctx1.err = err
+	ctx1.err = db.errorFilter(err)
 	db.postExecuteHandler(ctx1)
 
 	var tx1 = &Tx{TX: tx, db: db}
@@ -94,7 +104,7 @@ func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{
 
 	db.preExecuteHandler(ctx1)
 	var rows, err = db.DB.QueryContext(ctx1, query, args...)
-	ctx1.err = err
+	ctx1.err = db.errorFilter(err)
 	db.postExecuteHandler(ctx1)
 	return rows, err
 }
@@ -108,7 +118,7 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}
 
 	db.postExecuteHandler(ctx1)
 	var result, err = db.DB.ExecContext(ctx1, query, args...)
-	ctx1.err = err
+	ctx1.err = db.errorFilter(err)
 	db.postExecuteHandler(ctx1)
 	return result, err
 }
@@ -122,8 +132,24 @@ func (db *DB) GetContext(ctx context.Context, query string, args ...interface{})
 
 	db.postExecuteHandler(ctx1)
 	var err = db.getContextInner(ctx1, query, args...)
-	ctx1.err = err
+	ctx1.err = db.errorFilter(err)
 	db.postExecuteHandler(ctx1)
+	return err
+}
+
+func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
+	return db.SelectContext(context.Background(), dest, query, args...)
+}
+
+// Any placeholder parameters are replaced with supplied args.
+func (db *DB) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	var ctx1 = newContext(ctx, DBSelect, query)
+
+	db.postExecuteHandler(ctx1)
+	var err = db.selectContextInner(ctx1, dest, query, args...)
+	ctx1.err = db.errorFilter(err)
+	db.postExecuteHandler(ctx1)
+
 	return err
 }
 
@@ -147,11 +173,11 @@ func (db *DB) getContextInner(dest interface{}, query string, args ...interface{
 
 	v := reflect.ValueOf(dest)
 	if v.Kind() != reflect.Ptr {
-		return errors.New("must pass a pointer, not a value, to StructScan destination")
+		return ErrNotPointer
 	}
 
 	if v.IsNil() {
-		return errors.New("nil pointer passed to StructScan destination")
+		return ErrNilPointer
 	}
 
 	base := reflectx.Deref(v.Type())
@@ -217,22 +243,6 @@ func scanOneRow(rows *sql.Rows, dest ...interface{}) error {
 	return nil
 }
 
-func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
-	return db.SelectContext(context.Background(), dest, query, args...)
-}
-
-// Any placeholder parameters are replaced with supplied args.
-func (db *DB) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
-	var ctx1 = newContext(ctx, DBSelect, query)
-
-	db.postExecuteHandler(ctx1)
-	var err = db.selectContextInner(ctx1, dest, query, args...)
-	ctx1.err = err
-	db.postExecuteHandler(ctx1)
-
-	return err
-}
-
 // selectContextInner scans all rows into a destination, which must be a slice of any
 // type.  If the destination slice type is a Struct, then StructScan will be
 // used on each row.  If the destination is some other kind of base type, then
@@ -255,10 +265,10 @@ func (db *DB) selectContextInner(ctx context.Context, dest interface{}, query st
 
 	// json.Unmarshal returns errors for these
 	if value.Kind() != reflect.Ptr {
-		return errors.New("must pass a pointer, not a value, to StructScan destination")
+		return ErrNotPointer
 	}
 	if value.IsNil() {
-		return errors.New("nil pointer passed to StructScan destination")
+		return ErrNilPointer
 	}
 	direct := reflect.Indirect(value)
 
@@ -370,9 +380,10 @@ func isScannable(t reflect.Type) bool {
 func missingFields(transversals [][]int) (field int, err error) {
 	for i, t := range transversals {
 		if len(t) == 0 {
-			return i, errors.New("missing field")
+			return i, ErrMissingField
 		}
 	}
+
 	return 0, nil
 }
 
@@ -385,7 +396,7 @@ func missingFields(transversals [][]int) (field int, err error) {
 func fieldsByTraversal(v reflect.Value, traversals [][]int, values []interface{}, ptrs bool) error {
 	v = reflect.Indirect(v)
 	if v.Kind() != reflect.Struct {
-		return errors.New("argument not a struct")
+		return ErrNotStruct
 	}
 
 	for i, traversal := range traversals {

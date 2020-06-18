@@ -26,7 +26,7 @@ func (tx *Tx) QueryContext(ctx context.Context, query string, args ...interface{
 
 	tx.db.preExecuteHandler(ctx1)
 	var rows, err = tx.TX.QueryContext(ctx1, query, args...)
-	ctx1.err = err
+	ctx1.err = tx.db.errorFilter(err)
 	tx.db.postExecuteHandler(ctx1)
 	return rows, err
 }
@@ -40,7 +40,7 @@ func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}
 
 	tx.db.preExecuteHandler(ctx1)
 	var result, err = tx.TX.ExecContext(ctx1, query, args...)
-	ctx1.err = err
+	ctx1.err = tx.db.errorFilter(err)
 	tx.db.postExecuteHandler(ctx1)
 	return result, err
 }
@@ -54,7 +54,7 @@ func (tx *Tx) CommitContext(ctx context.Context) error {
 
 	tx.db.preExecuteHandler(ctx1)
 	var err = tx.TX.Commit()
-	ctx1.err = err
+	ctx1.err = tx.db.errorFilter(err)
 	tx.db.postExecuteHandler(ctx1)
 	return err
 }
@@ -68,7 +68,7 @@ func (tx *Tx) RollbackContext(ctx context.Context) error {
 
 	tx.db.preExecuteHandler(ctx1)
 	var err = tx.TX.Rollback()
-	ctx1.err = err
+	ctx1.err = tx.db.errorFilter(err)
 	tx.db.postExecuteHandler(ctx1)
 	return err
 }
