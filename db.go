@@ -17,25 +17,15 @@ author:     lixianmin
 Copyright (C) - All Rights Reserved
  *********************************************************************/
 
-var emptyHandler = func(ctx *Context) {}
-var emptyErrorFilter = func(err error) error { return err }
-
 type DB struct {
 	DB     *sql.DB
 	Mapper *reflectx.Mapper
-
-	preExecuteHandler  func(*Context)
-	postExecuteHandler func(*Context)
-	errorFilter        func(err error) error // 所有的public方法，都需要在返回err的时候调用errorFilter(err)
 }
 
 func NewDB(db *sql.DB) *DB {
 	var my = &DB{
-		DB:                 db,
-		Mapper:             reflectx.NewMapperFunc("db", strings.ToLower),
-		preExecuteHandler:  emptyHandler,
-		postExecuteHandler: emptyHandler,
-		errorFilter:        emptyErrorFilter,
+		DB:     db,
+		Mapper: reflectx.NewMapperFunc("db", strings.ToLower),
 	}
 
 	return my
@@ -57,79 +47,40 @@ func Connect(driverName, dataSourceName string) (*DB, error) {
 	return NewDB(db), nil
 }
 
-func (db *DB) SetPreExecuteHandler(handler func(ctx *Context)) {
-	if handler != nil {
-		db.preExecuteHandler = handler
-	} else {
-		db.preExecuteHandler = emptyHandler
-	}
-}
-
-func (db *DB) SetPostExecuteHandler(handler func(ctx *Context)) {
-	if handler != nil {
-		db.postExecuteHandler = handler
-	} else {
-		db.postExecuteHandler = emptyHandler
-	}
-}
-
-func (db *DB) SetErrorFilter(filter func(error) error) {
-	if filter != nil {
-		db.errorFilter = filter
-	}
-}
-
-func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
-	var ctx1 = newContext(ctx, DBBeginTx, "BeginTx")
-
-	db.preExecuteHandler(ctx1)
+func (db *DB) BeginTx(ctx *Context, opts *sql.TxOptions) (*Tx, error) {
+	var ctx1 = ensureContext(ctx)
 	var tx, err = db.DB.BeginTx(ctx1, opts)
-	ctx1.err = db.errorFilter(err)
-	db.postExecuteHandler(ctx1)
-
-	var tx1 = &Tx{TX: tx, db: db}
+	err = ctx1.ErrorFilter(err)
+	var tx1 = &Tx{TX: tx, ctx: ctx1}
 	return tx1, err
 }
 
-func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	var ctx1 = newContext(ctx, DBQuery, query)
-
-	db.preExecuteHandler(ctx1)
+func (db *DB) QueryContext(ctx *Context, query string, args ...interface{}) (*sql.Rows, error) {
+	var ctx1 = ensureContext(ctx)
 	var rows, err = db.DB.QueryContext(ctx1, query, args...)
-	ctx1.err = db.errorFilter(err)
-	db.postExecuteHandler(ctx1)
+	err = ctx1.ErrorFilter(err)
 	return rows, err
 }
 
-func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	var ctx1 = newContext(ctx, DBExec, query)
-
-	db.postExecuteHandler(ctx1)
+func (db *DB) ExecContext(ctx *Context, query string, args ...interface{}) (sql.Result, error) {
+	var ctx1 = ensureContext(ctx)
 	var result, err = db.DB.ExecContext(ctx1, query, args...)
-	ctx1.err = db.errorFilter(err)
-	db.postExecuteHandler(ctx1)
+	err = ctx1.ErrorFilter(err)
 	return result, err
 }
 
-func (db *DB) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
-	var ctx1 = newContext(ctx, DBGet, query)
-
-	db.postExecuteHandler(ctx1)
+func (db *DB) GetContext(ctx *Context, dest interface{}, query string, args ...interface{}) error {
+	var ctx1 = ensureContext(ctx)
 	var err = db.getContextInner(ctx1, dest, query, args...)
-	ctx1.err = db.errorFilter(err)
-	db.postExecuteHandler(ctx1)
+	err = ctx1.ErrorFilter(err)
 	return err
 }
 
 // Any placeholder parameters are replaced with supplied args.
-func (db *DB) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
-	var ctx1 = newContext(ctx, DBSelect, query)
-
-	db.postExecuteHandler(ctx1)
+func (db *DB) SelectContext(ctx *Context, dest interface{}, query string, args ...interface{}) error {
+	var ctx1 = ensureContext(ctx)
 	var err = db.selectContextInner(ctx1, dest, query, args...)
-	ctx1.err = db.errorFilter(err)
-	db.postExecuteHandler(ctx1)
-
+	err = ctx1.ErrorFilter(err)
 	return err
 }
 

@@ -1,7 +1,6 @@
 package dbi
 
 import (
-	"context"
 	"database/sql"
 )
 
@@ -13,38 +12,32 @@ Copyright (C) - All Rights Reserved
  *********************************************************************/
 
 type Tx struct {
-	TX *sql.Tx
-	db *DB
+	TX  *sql.Tx
+	ctx *Context
 }
 
-func (tx *Tx) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	var ctx1 = newContext(ctx, TxQuery, query)
-
-	tx.db.preExecuteHandler(ctx1)
+func (tx *Tx) QueryContext(ctx *Context, query string, args ...interface{}) (*sql.Rows, error) {
+	var ctx1 = ensureContext(ctx)
 	var rows, err = tx.TX.QueryContext(ctx1, query, args...)
-	ctx1.err = tx.db.errorFilter(err)
-	tx.db.postExecuteHandler(ctx1)
+	err = ctx1.ErrorFilter(err)
 	return rows, err
 }
 
-func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	var ctx1 = newContext(ctx, TxExec, query)
-
-	tx.db.preExecuteHandler(ctx1)
+func (tx *Tx) ExecContext(ctx *Context, query string, args ...interface{}) (sql.Result, error) {
+	var ctx1 = ensureContext(ctx)
 	var result, err = tx.TX.ExecContext(ctx1, query, args...)
-	ctx1.err = tx.db.errorFilter(err)
-	tx.db.postExecuteHandler(ctx1)
+	err = ctx1.ErrorFilter(err)
 	return result, err
 }
 
 func (tx *Tx) Commit() error {
 	var err = tx.TX.Commit()
-	err = tx.db.errorFilter(err)
+	err = tx.ctx.ErrorFilter(err)
 	return err
 }
 
 func (tx *Tx) Rollback() error {
 	var err = tx.TX.Rollback()
-	err = tx.db.errorFilter(err)
+	err = tx.ctx.ErrorFilter(err)
 	return err
 }

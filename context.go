@@ -9,27 +9,44 @@ author:     lixianmin
 Copyright (C) - All Rights Reserved
  *********************************************************************/
 
+var emptyErrorFilter = func(err error) error { return err }
+
+var background = &Context{
+	Context:     context.Background(),
+	ErrorFilter: emptyErrorFilter,
+}
+
 type Context struct {
 	context.Context
-	Kind int
-	Text string
-	//StartTime time.Time
-	err error
+	ErrorFilter func(err error) error // 所有的public方法，都需要在返回err的时候调用errorFilter(err)
 }
 
-func newContext(ctx context.Context, kind int, text string) *Context {
-	return &Context{
-		Context: ctx,
-		Kind:    kind,
-		Text:    text,
-		//StartTime: time.Now(),
+func NewContext(other Context) *Context {
+	var ctx = &Context{
+		Context:     other.Context,
+		ErrorFilter: other.ErrorFilter,
 	}
+
+	if ctx.Context == nil {
+		ctx.Context = background.Context
+	}
+
+	if ctx.ErrorFilter == nil {
+		ctx.ErrorFilter = background.ErrorFilter
+	}
+
+	return ctx
 }
 
-func (ctx *Context) Err() error {
-	if ctx.err != nil {
-		return ctx.err
+func Background() *Context {
+	return background
+}
+
+// 确保返回一个非空的ctx对象
+func ensureContext(ctx *Context) *Context {
+	if ctx != nil {
+		return ctx
 	}
 
-	return ctx.Context.Err()
+	return background
 }
