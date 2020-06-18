@@ -123,15 +123,15 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}
 	return result, err
 }
 
-func (db *DB) Get(ctx context.Context, query string, args ...interface{}) error {
-	return db.GetContext(context.Background(), query, args...)
+func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
+	return db.GetContext(context.Background(), dest, query, args...)
 }
 
-func (db *DB) GetContext(ctx context.Context, query string, args ...interface{}) error {
+func (db *DB) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
 	var ctx1 = newContext(ctx, DBGet, query)
 
 	db.postExecuteHandler(ctx1)
-	var err = db.getContextInner(ctx1, query, args...)
+	var err = db.getContextInner(ctx1, dest, query, args...)
 	ctx1.err = db.errorFilter(err)
 	db.postExecuteHandler(ctx1)
 	return err
@@ -158,8 +158,8 @@ func (db *DB) SelectContext(ctx context.Context, dest interface{}, query string,
 // StructScan is used.  Get will return sql.ErrNoRows like row.Scan would.
 // Any placeholder parameters are replaced with supplied args.
 // An error is returned if the result set is empty.
-func (db *DB) getContextInner(dest interface{}, query string, args ...interface{}) error {
-	rows, err := db.DB.Query(query, args...)
+func (db *DB) getContextInner(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	rows, err := db.DB.QueryContext(ctx, query, args...)
 
 	if err != nil {
 		return err
