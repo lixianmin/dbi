@@ -50,7 +50,7 @@ func Connect(driverName, dataSourceName string) (*DB, error) {
 func (db *DB) BeginTx(ctx *Context, opts *sql.TxOptions) (*Tx, error) {
 	var ctx1 = ensureContext(ctx)
 	var tx, err = db.DB.BeginTx(ctx1, opts)
-	err = ctx1.ErrorFilter(err)
+	err = ctx1.errorFilter(err)
 	var tx1 = &Tx{TX: tx, ctx: ctx1}
 	return tx1, err
 }
@@ -58,21 +58,21 @@ func (db *DB) BeginTx(ctx *Context, opts *sql.TxOptions) (*Tx, error) {
 func (db *DB) QueryContext(ctx *Context, query string, args ...interface{}) (*sql.Rows, error) {
 	var ctx1 = ensureContext(ctx)
 	var rows, err = db.DB.QueryContext(ctx1, query, args...)
-	err = ctx1.ErrorFilter(err)
+	err = ctx1.errorFilter(err)
 	return rows, err
 }
 
 func (db *DB) ExecContext(ctx *Context, query string, args ...interface{}) (sql.Result, error) {
 	var ctx1 = ensureContext(ctx)
 	var result, err = db.DB.ExecContext(ctx1, query, args...)
-	err = ctx1.ErrorFilter(err)
+	err = ctx1.errorFilter(err)
 	return result, err
 }
 
 func (db *DB) GetContext(ctx *Context, dest interface{}, query string, args ...interface{}) error {
 	var ctx1 = ensureContext(ctx)
 	var err = db.getContextInner(ctx1, dest, query, args...)
-	err = ctx1.ErrorFilter(err)
+	err = ctx1.errorFilter(err)
 	return err
 }
 
@@ -80,7 +80,7 @@ func (db *DB) GetContext(ctx *Context, dest interface{}, query string, args ...i
 func (db *DB) SelectContext(ctx *Context, dest interface{}, query string, args ...interface{}) error {
 	var ctx1 = ensureContext(ctx)
 	var err = db.selectContextInner(ctx1, dest, query, args...)
-	err = ctx1.ErrorFilter(err)
+	err = ctx1.errorFilter(err)
 	return err
 }
 
