@@ -79,11 +79,7 @@ func (db *DB) SetErrorFilter(filter func(error) error) {
 	}
 }
 
-func (db *DB) BeginTx(opts *sql.TxOptions) (*Tx, error) {
-	return db.BeginTxContext(context.Background(), opts)
-}
-
-func (db *DB) BeginTxContext(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	var ctx1 = newContext(ctx, DBBeginTx, "BeginTx")
 
 	db.preExecuteHandler(ctx1)
@@ -93,10 +89,6 @@ func (db *DB) BeginTxContext(ctx context.Context, opts *sql.TxOptions) (*Tx, err
 
 	var tx1 = &Tx{TX: tx, db: db}
 	return tx1, err
-}
-
-func (db *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
-	return db.QueryContext(context.Background(), query, args...)
 }
 
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
@@ -109,10 +101,6 @@ func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{
 	return rows, err
 }
 
-func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
-	return db.ExecContext(context.Background(), query, args...)
-}
-
 func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	var ctx1 = newContext(ctx, DBExec, query)
 
@@ -123,10 +111,6 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}
 	return result, err
 }
 
-func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
-	return db.GetContext(context.Background(), dest, query, args...)
-}
-
 func (db *DB) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
 	var ctx1 = newContext(ctx, DBGet, query)
 
@@ -135,10 +119,6 @@ func (db *DB) GetContext(ctx context.Context, dest interface{}, query string, ar
 	ctx1.err = db.errorFilter(err)
 	db.postExecuteHandler(ctx1)
 	return err
-}
-
-func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
-	return db.SelectContext(context.Background(), dest, query, args...)
 }
 
 // Any placeholder parameters are replaced with supplied args.
