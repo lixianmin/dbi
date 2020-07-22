@@ -30,7 +30,10 @@ type Context struct {
 }
 
 func NewContext(parent context.Context, args ContextArgs) *Context {
-	parent = ensureContext(parent)
+	if parent == nil {
+		parent = background
+	}
+
 	ensureArgs(&args)
 
 	var ctx = &Context{
@@ -98,7 +101,7 @@ func Background() *Context {
 }
 
 // 确保返回一个非空的ctx对象
-func ensureContext(ctx context.Context) context.Context {
+func ensureContext(ctx *Context) *Context {
 	if ctx != nil {
 		return ctx
 	}
