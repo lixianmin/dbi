@@ -1,6 +1,8 @@
 package dbi
 
 import (
+	"context"
+	"fmt"
 	"time"
 )
 
@@ -23,11 +25,11 @@ type ContextArgs struct {
 }
 
 type Context struct {
-	parent *Context
+	parent context.Context
 	args   ContextArgs
 }
 
-func NewContext(parent *Context, args ContextArgs) *Context {
+func NewContext(parent context.Context, args ContextArgs) *Context {
 	parent = ensureContext(parent)
 	ensureArgs(&args)
 
@@ -39,10 +41,11 @@ func NewContext(parent *Context, args ContextArgs) *Context {
 	return ctx
 }
 
-func (ctx *Context) errorFilter(err error) error {
+func (ctx *Context) ErrorFilter(err error) error {
 	var err1 = ctx.args.ErrorFilter(err)
-	if ctx.parent != nil {
-		err1 = ctx.parent.errorFilter(err1)
+	var parentCtx, ok = ctx.parent.(IContext)
+	if ok {
+		err1 = parentCtx.ErrorFilter(err1)
 	}
 
 	return err1
@@ -81,8 +84,9 @@ func (ctx *Context) Value(key interface{}) interface{} {
 }
 
 func (ctx *Context) String() string {
-	if ctx.parent != nil {
-		return ctx.parent.String()
+	var parentCtx, ok = ctx.parent.(fmt.Stringer)
+	if ok {
+		return parentCtx.String()
 	}
 
 	return ""
@@ -94,7 +98,7 @@ func Background() *Context {
 }
 
 // 确保返回一个非空的ctx对象
-func ensureContext(ctx *Context) *Context {
+func ensureContext(ctx context.Context) context.Context {
 	if ctx != nil {
 		return ctx
 	}
