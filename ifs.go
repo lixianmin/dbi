@@ -1,6 +1,9 @@
 package dbi
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+)
 
 /********************************************************************
 created:    2020-06-18
@@ -19,4 +22,8 @@ type IQueryContext interface {
 
 type IExecContext interface {
 	ExecContext(ctx *Context, query string, args ...interface{}) (sql.Result, error)
+}
+
+type IRawQuery interface {
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 }
